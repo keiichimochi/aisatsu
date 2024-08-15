@@ -4,16 +4,13 @@ from dotenv import load_dotenv
 import os
 import json
 import time
-from datetime import datetime
-import uuid
 
 # .envファイルから環境変数を読み込む
 load_dotenv()
 
-# ファイルのパス
+# エピソードファイルのパス
 EPISODE_FILE = "episode.json"
 PROMPT_FILE = "prompt.json"
-SPEECHES_FILE = "speeches.json"
 
 # エピソードを読み込む関数
 def load_episodes():
@@ -39,63 +36,9 @@ def save_prompt(prompt):
     with open(PROMPT_FILE, "w") as file:
         json.dump(prompt, file, ensure_ascii=False, indent=4)
 
-# 挨拶を読み込む関数
-def load_speeches():
-    if os.path.exists(SPEECHES_FILE):
-        with open(SPEECHES_FILE, "r") as file:
-            return json.load(file)
-    return []
-
-# 挨拶を保存する関数
-def save_speech(speech):
-    speeches = load_speeches()
-    speeches.append(speech)
-    with open(SPEECHES_FILE, "w") as file:
-        json.dump(speeches, file, ensure_ascii=False, indent=4)
-
-# 改善されたプロンプトフォーマット
-improved_prompt = """
-{custom_prompt}
-
-上記の指示に加えて、以下のパラメータと指示に従って結婚式での父親の挨拶を生成してください：
-
-1. 挨拶の長さ: {speech_time}分で読み上げられる長さにしてください。
-2. 面白さのレベル: 1から10の範囲で{humor}です。1は非常に真面目、10は非常にユーモラスな内容を示します。このレベルに応じて、適切な冗談や軽い話題を織り交ぜてください。
-
-3. 以下のエピソードを適切に組み込んでください：
-   - エピソード1: {episode1}
-   - エピソード2: {episode2}
-   - エピソード3: {episode3}
-
-4. 娘に関する追加のエピソード（適宜使用）：
-   {daughter_episodes}
-
-5. 婿に関する追加のエピソード（適宜使用）：
-   {son_in_law_episodes}
-
-これらの要素を考慮しながら、温かみがあり、{humor}のレベルに応じた面白さを持つ、{speech_time}分の挨拶を作成してください。
-"""
-
-# プロンプトの使用
-def generate_formatted_prompt(speech_time, humor, episode1, episode2, episode3, episodes, prompt_data):
-    custom_prompt = prompt_data["edited_prompt"] or prompt_data["default_prompt"]
-    
-    formatted_prompt = improved_prompt.format(
-        custom_prompt=custom_prompt,
-        speech_time=speech_time,
-        humor=humor,
-        episode1=episode1,
-        episode2=episode2,
-        episode3=episode3,
-        daughter_episodes=', '.join(episodes['daughter_episodes']),
-        son_in_law_episodes=', '.join(episodes['son_in_law_episodes'])
-    )
-    return formatted_prompt
-
 # エピソードとプロンプトを読み込む
 episodes = load_episodes()
 prompt_data = load_prompt()
-speeches = load_speeches()
 
 # タイトル
 st.title("結婚式の挨拶生成アプリ")
@@ -165,9 +108,16 @@ if st.button("挨拶を生成"):
             st.error("Claude APIキーが設定されていません。")
             st.stop()
 
-        # 改善されたプロンプト生成関数を使用
-        formatted_prompt = generate_formatted_prompt(
-            speech_time, humor, episode1, episode2, episode3, episodes, prompt_data
+        # 挨拶のプロンプトを作成
+        prompt = edited_prompt if edited_prompt else default_prompt
+        prompt = prompt.format(
+            speech_time=speech_time,
+            humor=humor,
+            episode1=episode1,
+            episode2=episode2,
+            episode3=episode3,
+            daughter_episodes=', '.join(episodes['daughter_episodes']),
+            son_in_law_episodes=', '.join(episodes['son_in_law_episodes'])
         )
         
         # 挨拶を生成
@@ -176,23 +126,12 @@ if st.button("挨拶を生成"):
             try:
                 response = completion(
                     model="claude-3-5-sonnet-20240620",
-                    messages=[{"role": "user", "content": formatted_prompt}],
+                    messages=[{"role": "user", "content": prompt}],
                     api_key=api_key
                 )
                 # 挨拶を表示
-                speech_content = response['choices'][0]['message']['content']
                 st.success("挨拶が正常に生成されました。")
-                st.write(speech_content)
-                
-                # 挨拶を保存
-                speech = {
-                    "id": str(uuid.uuid4()),
-                    "content": speech_content,
-                    "created_at": datetime.now().isoformat(),
-                    "speech_time": speech_time,
-                    "humor": humor
-                }
-                save_speech(speech)
+                st.write(response['choices'][0]['message']['content'])
                 break
             except APIConnectionError as e:
                 if attempt < max_retries - 1:
@@ -203,12 +142,3 @@ if st.button("挨拶を生成"):
             except Exception as e:
                 st.error(f"予期せぬエラーが発生しました: {str(e)}")
                 break
-
-# 保存された挨拶の表示
-st.subheader("作成済み挨拶")
-for speech in speeches:
-    st.write(f"ID: {speech['id']}")
-    st.write(f"作成日時: {speech['created_at']}")
-    st.write(f"内容: {speech['content'][:50]}...")
-    if st.button(f"表示 {speech['id']}"):
-        st.write(speech['content'])
