@@ -62,11 +62,6 @@ improved_prompt = """
 1. 挨拶の長さ: {speech_time}分で読み上げられる長さにしてください。
 2. 面白さのレベル: 1から10の範囲で{humor}です。1は非常に真面目、10は非常にユーモラスな内容を示します。このレベルに応じて、適切な冗談や軽い話題を織り交ぜてください。
 
-3. 以下のエピソードを適切に組み込んでください：
-   - エピソード1: {episode1}
-   - エピソード2: {episode2}
-   - エピソード3: {episode3}
-
 4. 娘に関する追加のエピソード（適宜使用）：
    {daughter_episodes}
 
@@ -77,16 +72,16 @@ improved_prompt = """
 """
 
 # プロンプトの使用
-def generate_formatted_prompt(speech_time, humor, episode1, episode2, episode3, episodes, prompt_data):
+def generate_formatted_prompt(speech_time, humor, episodes, prompt_data):
     custom_prompt = prompt_data["edited_prompt"] or prompt_data["default_prompt"]
     
     formatted_prompt = improved_prompt.format(
         custom_prompt=custom_prompt,
         speech_time=speech_time,
         humor=humor,
-        episode1=episode1,
-        episode2=episode2,
-        episode3=episode3,
+        episode1="",
+        episode2="",
+        episode3="",
         daughter_episodes=', '.join(episodes['daughter_episodes']),
         son_in_law_episodes=', '.join(episodes['son_in_law_episodes'])
     )
@@ -105,11 +100,6 @@ speech_time = st.slider("挨拶の時間（分）", 1, 10, 5)
 
 # 内容の面白さ
 humor = st.slider("内容の面白さ", 1, 10, 5)
-
-# 盛り込むエピソード
-episode1 = st.text_input("エピソード1")
-episode2 = st.text_input("エピソード2")
-episode3 = st.text_input("エピソード3")
 
 # プロンプトの編集
 st.subheader("プロンプトの編集")
@@ -159,7 +149,7 @@ for i, episode in enumerate(episodes["son_in_law_episodes"]):
 # 挨拶生成ボタン
 if st.button("挨拶を生成"):
     with st.spinner("挨拶を生成中..."):
-        api_key = os.getenv("CLAUDE_API_KEY")
+        api_key = os.getenv("ANTHROPIC_API_KEY")
         
         if not api_key:
             st.error("Claude APIキーが設定されていません。")
@@ -167,7 +157,7 @@ if st.button("挨拶を生成"):
 
         # 改善されたプロンプト生成関数を使用
         formatted_prompt = generate_formatted_prompt(
-            speech_time, humor, episode1, episode2, episode3, episodes, prompt_data
+            speech_time, humor, episodes, prompt_data
         )
         
         # 挨拶を生成
